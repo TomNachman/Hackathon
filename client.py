@@ -1,20 +1,19 @@
 import select
 import socket
 import sys
-import threading
 import time
 from socket import *
 import struct
 import config
 
 
-def validate_header_data(decode_data) -> bool:
+def validate_data(decode_data) -> bool:
     """
     Validates that the sent data contains the MAGIC_COOKIE ,M_TYPE
     @param decode_data: Received data to check.
     @return: True if data is valid, else False.
     """
-    return len(decode_data) != 3 or decode_data[0] != config.MAGIC_COOKIE or decode_data[1] != config.MESSAGE_TYPE
+    return len(decode_data) == 3 and decode_data[0] == config.MAGIC_COOKIE and decode_data[1] == config.MESSAGE_TYPE
 
 
 class Client:
@@ -34,7 +33,7 @@ class Client:
         self.udp_sock = socket(AF_INET, SOCK_DGRAM)
         self.udp_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.udp_sock.bind((config.UDP_IP, config.UDP_PORT))
-        self.game_over = True  # Variable providing info whether to keep sending messages or not.
+        self.game_running = True  # Variable providing info whether to keep sending messages or not.
 
     def listen_state(self) -> None:
         """
@@ -49,7 +48,7 @@ class Client:
 
             try:
                 decode_data = struct.unpack('IbH', encode_data)
-                if validate_header_data(decode_data):
+                if validate_data(decode_data):
                     self.connect_to_server(server_ip=address[0], server_tcp_port=decode_data[2])
                     # in case we 'break' means established succeed !
                     break
@@ -73,61 +72,54 @@ class Client:
         except:
             print("TCP initiation went wrong.")
 
-    def messages_from_server(self) -> bool:
-        while True:
-            try:
-                message = self.tcp_socket.recv(config.BUFFER_SIZE).decode('utf-8')
-                if len(message) > 0:
-                    print(f'{config.OK_BLUE}{message}{config.END}')
-
-                if message.startswith('Game over!') or not message:
-                    self.game_over = True
-                    print(f'{config.WARNING}Server disconnected, listening for offer requests...{config.END}')
-                    return False
-                # First message, client is waiting for it after the tcp connection.
-                if message.startswith('Welcome'):
-                    return True
-
-            except KeyboardInterrupt as e:
-                # Would be handled on main() function.
-                raise e
-
-            except:
-                raise ConnectionRefusedError("Server is down.")
-
+    def message_from_server_handler(self, msg) -> None:
+        print(msg.decode("utf-8"))
+        if not self.game_running:
+            self.game_running = True
+            return
+        if self.game_running:
+            self.game_running = False
 
     def run_game(self):
         """
         This function initiate the game
         """
         while True:
-            time.sleep(1)
+            time.sleep(0.1)
             try:
                 self.listen_state()  # searching for server and connecting over TCP
-                start_game = client.messages_from_server()  # waits for game initiating  by server
-                if start_game:
-                    client.game_over = False
-                    messages_thread = threading.Thread(target=client.messages_from_server)
-                    # listening for tcp messages in the background
-                    messages_thread.start()
-                    # TODO : handle keyboard here
-                    # waits for a thread to die
-                    messages_thread.join()
+                welcome_msg = self.tcp_socket.recv(config.BUFFER_SIZE).decode('utf-8')
+                print(f'{config.OK_BLUE}{welcome_msg}{config.END}')
 
+                # set the socket to be non blocking in order to be able to read and write simultaneously
+                self.tcp_socket.setblocking(False)
+                while self.game_running:
+                    time.sleep(0.1)
+                    # Wait for some kind of I/O
+                    data = select.select([sys.stdin], [], [], 0)
+                    if data[0] and self.game_running:
+                        char_to_send = sys.stdin.read(1)
+                        self.tcp_socket.send(bytes(char_to_send, 'utf-8'))  # this line sends the char.
+                    try:
+                        msg_from_server = self.tcp_socket.recv(config.BUFFER_SIZE)
+                        self.message_from_server_handler(msg_from_server)
+                        if not self.game_running or msg_from_server:
+                            break
+                    except:
+                        pass
                 # close tcp connection
-                client.tcp_socket.shutdown(socket.SHUT_RDWR)
                 client.tcp_socket.close()
 
             except ConnectionRefusedError:
                 print('Server disconnected')
 
-            except:
+            except Exception as e:
                 print('Error, reconnecting...')
                 continue
 
 
 if __name__ == "__main__":
-    client = Client('NSO')
+    client = Client('Tom_Shahar')
     print(f"{config.OK_GREEN}Client started, listening for offer requests...{config.END}")
     try:
         client.run_game()
@@ -135,3 +127,4 @@ if __name__ == "__main__":
         print('KeyboardInterrupt')
         pass
     print("Client Done!")
+
