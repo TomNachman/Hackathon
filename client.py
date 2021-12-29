@@ -9,7 +9,7 @@ import config
 
 def validate_data(decode_data) -> bool:
     """
-    Validates that the sent data contains the MAGIC_COOKIE ,M_TYPE
+    Validates that the sent data contains the MAGIC_COOKIE and M_TYPE
     @param decode_data: Received data to check.
     @return: True if data is valid, else False.
     """
@@ -26,8 +26,6 @@ class Client:
         game_running - boolean that express the status of the game.
         """
         self.group_name = group_name
-        self.magic_cookie = config.MAGIC_COOKIE
-        self.offer_message = config.MESSAGE_TYPE
         # Sockets init
         self.tcp_socket = None
         self.udp_sock = socket(AF_INET, SOCK_DGRAM)
@@ -50,7 +48,7 @@ class Client:
                 decode_data = struct.unpack('IbH', encode_data)
                 if validate_data(decode_data):
                     self.connect_to_server(server_ip=address[0], server_tcp_port=decode_data[2])
-                    # in case we 'break' means established succeed !
+                    # if we break that means that connecto to server succesded
                     break
             except:
                 # Continue looking for connections if data is invalid.
@@ -95,11 +93,11 @@ class Client:
                 self.tcp_socket.setblocking(False)
                 while self.game_running:
                     time.sleep(0.1)
-                    # Wait for some kind of I/O
+                    # Wait for some kind of I/O operation
                     data = select.select([sys.stdin], [], [], 0)
                     if data[0] and self.game_running:
                         char_to_send = sys.stdin.read(1)
-                        self.tcp_socket.send(bytes(char_to_send, 'utf-8'))  # this line sends the char.
+                        self.tcp_socket.send(bytes(char_to_send, 'utf-8'))
                     try:
                         msg_from_server = self.tcp_socket.recv(config.BUFFER_SIZE)
                         self.message_from_server_handler(msg_from_server)
@@ -119,7 +117,7 @@ class Client:
 
 
 if __name__ == "__main__":
-    client = Client('Tom_Shahar')
+    client = Client('Stuxnet')
     print(f"{config.OK_GREEN}Client started, listening for offer requests...{config.END}")
     try:
         client.run_game()
@@ -127,4 +125,3 @@ if __name__ == "__main__":
         print('KeyboardInterrupt')
         pass
     print("Client Done!")
-

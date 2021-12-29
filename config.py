@@ -1,8 +1,7 @@
-"""
-for this assignment this file is .py but it should by a config file ( .ini for example) and should be under .gitignore
-"""
+"""for this assignment this file is .py but it should by a config file ( .ini for example) and should be under
+.gitignore since you can find secrets here """
 import random
-from typing import Tuple, Union
+from typing import Tuple
 
 # GLOBALS - CONSTANTS
 UDP_PORT = 13117
@@ -36,5 +35,4 @@ def generate_simple_math() -> Tuple[str, int]:
         msg = f"{OK_BLUE}How much is " + str(num1) + operation + str(num2) + "?\n"
         answer = ops[operation](num1, num2)
         if answer in r:
-            return msg, answer
-
+            return msg, int(answer)
